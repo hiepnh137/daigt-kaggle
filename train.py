@@ -71,7 +71,7 @@ class config:
     PRINT_FREQ = 20
     SCHEDULER = 'cosine' # ['linear', 'cosine']
     SEED = 27
-    TRAIN = True
+    TRAIN = False
     TRAIN_FOLDS = [0, 1, 2, 3]
     WANDB = False
     WEIGHT_DECAY = 0.01
@@ -86,11 +86,15 @@ class kaggle_paths:
     
 class paths:
     OUTPUT_DIR = "output"
-    EXTERNAL_DATA = "daigt-external-dataset/daigt_external_dataset.csv"
-    TRAIN_PROMPTS = "llm-detect-ai-generated-text/train_prompts.csv"
-    TRAIN_ESSAYS = "llm-detect-ai-generated-text/train_essays.csv"
-    TEST_ESSAYS = "llm-detect-ai-generated-text/test_essays.csv"
+    EXTERNAL_DATA = "data/external-dataset/daigt_external_dataset.csv"
+    TRAIN_PROMPTS = "data/LLM-DetectAI/train_prompts.csv"
+    TRAIN_ESSAYS = "data/LLM-DetectAI/train_essays.csv"
+    TEST_ESSAYS = "data/LLM-DetectAI/test_essays.csv"
     PROCESSED_DATA = "data/train_essays_1.0.csv"
+
+    MODEL_PATH = "output"
+    BEST_MODEL_PATH = "output/microsoft_deberta-v3-base_fold_0_best.pth"
+    SUBMISSION_CSV = "data/LLM-DetectAI/sample_submission.csv"
 
 if config.DEBUG:
     config.EPOCHS = 2
@@ -436,6 +440,39 @@ def train_loop(folds, fold):
     
     return valid_folds
 
+def inference_fn(config, test_df, tokenizer, device):
+    # ======== DATASETS ==========
+    test_dataset = CustomDataset(config, test_df, tokenizer)
+
+    # ======== DATALOADERS ==========
+    test_loader = DataLoader(test_dataset,
+                             batch_size=config.BATCH_SIZE_TEST,
+                             shuffle=False,
+                             num_workers=0,
+                             pin_memory=True, drop_last=False)
+    
+    # ======== MODEL ==========
+    model = CustomModel(config, config_path=paths.MODEL_PATH + "/config.pth", pretrained=False)
+    state = torch.load(paths.BEST_MODEL_PATH)
+    model.load_state_dict(state)
+    model.to(device)
+    model.eval() # set model in evaluation mode
+    prediction_dict = {}
+    preds = []
+    with tqdm(test_loader, unit="test_batch", desc='Inference') as tqdm_test_loader:
+        for step, batch in enumerate(tqdm_test_loader):
+            inputs = batch.pop("inputs")
+            ids = batch.pop("ids")
+            inputs = collate(inputs) # collate inputs
+            for k, v in inputs.items():
+                inputs[k] = v.to(device) # send inputs to device
+            with torch.no_grad():
+                y_preds = model(inputs) # forward propagation pass
+            preds.append(y_preds.to('cpu').numpy()) # save predictions
+
+    prediction_dict["predictions"] = np.concatenate(preds) # np.array() of shape (fold_size, target_cols)
+    prediction_dict["ids"] = ids
+    return prediction_dict
 
 def get_result(oof_df):
     labels = oof_df["generated"].values
@@ -482,3 +519,20 @@ if config.TRAIN:
     LOGGER.info(f"========== CV ==========")
     get_result(oof_df)
     oof_df.to_csv(paths.OUTPUT_DIR + '/oof_df.csv', index=False)
+
+else:
+    test_df = pd.read_csv(paths.TEST_ESSAYS, sep=',')
+    print(f"Test summaries dataframe has shape: {test_df.shape}"), sep()
+
+    tokenizer = AutoTokenizer.from_pretrained(paths.MODEL_PATH + "/tokenizer")
+    # === Add special tokens ===
+    vocabulary = tokenizer.get_vocab()
+    total_tokens = len(vocabulary)
+    print("Total number of tokens in the tokenizer:", total_tokens)
+    print(tokenizer)
+    
+    predictions = inference_fn(config, test_df, tokenizer, device)
+    submission = pd.read_csv(paths.SUBMISSION_CSV)
+    submission["generated"] = predictions["predictions"]
+    submission["generated"] = submission["generated"].apply(lambda x: sigmoid(x))
+    submission.to_csv("submission.csv", index=False)
