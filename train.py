@@ -32,10 +32,15 @@ from torch.optim import Adam, SGD, AdamW
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader, Dataset
 from tqdm.auto import tqdm
-import tokenizers
+# import tokenizers
 import transformers
 from transformers import AutoTokenizer, AutoModel, AutoConfig
 from transformers import get_linear_schedule_with_warmup, get_cosine_schedule_with_warmup
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+
+from sklearn.metrics import confusion_matrix
 
 
 # ======= OPTIONS =========
@@ -90,7 +95,7 @@ class paths:
     TRAIN_PROMPTS = "data/LLM-DetectAI/train_prompts.csv"
     TRAIN_ESSAYS = "data/LLM-DetectAI/train_essays.csv"
     TEST_ESSAYS = "data/LLM-DetectAI/test_essays.csv"
-    PROCESSED_DATA = "data/train_essays_1.0.csv"
+    PROCESSED_DATA = "train_essays_3.0.csv"
 
     MODEL_PATH = "output"
     BEST_MODEL_PATH = "output/microsoft_deberta-v3-base_fold_0_best.pth"
@@ -174,6 +179,30 @@ def sigmoid(x):
     
 LOGGER = get_logger()
 seed_everything(seed=config.SEED)
+
+
+notes = ""
+
+if config.WANDB:
+    try:
+        # from kaggle_secrets import UserSecretsClient
+        # user_secrets = UserSecretsClient()
+        # secret_value_0 = user_secrets.get_secret("wandb_api")
+        # wandb.login(key=secret_value_0)
+        # anony = None
+        wandb.login(key='a3cae2e24b9f52f5007c896738f0fb473b2f3ad5')
+    except:
+        anony = "must"
+        print('If you want to use your W&B account, go to Add-ons -> Secrets and provide your W&B access token. Use the Label name as wandb_api. \nGet your W&B access token from here: https://wandb.ai/authorize')
+
+    run = wandb.init(project='kaggle-daigt', 
+                     name="test_1",
+                     config=get_config_dict(config),
+                    #  group="anti_overfit",
+                     job_type="train",
+                     notes=notes,
+                     anonymous=anony)
+
 
 def prepare_input(cfg, text, tokenizer):
     """
@@ -307,6 +336,9 @@ def train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, dev
                               loss=losses,
                               grad_norm=grad_norm,
                               lr=scheduler.get_lr()[0]))
+            if config.WANDB:
+                wandb.log({f"[fold_{fold}] train loss": losses.val,
+                           f"[fold_{fold}] lr": scheduler.get_lr()[0]})
 
     return losses.avg
 
@@ -344,6 +376,8 @@ def valid_epoch(valid_loader, model, criterion, device):
                       .format(step, len(valid_loader),
                               loss=losses,
                               remain=timeSince(start, float(step+1)/len(valid_loader))))
+            if config.WANDB:
+                wandb.log({f"[fold_{fold}] val loss": losses.val})
 
     prediction_dict["predictions"] = np.concatenate(preds) # np.array() of shape (fold_size, target_cols)
     prediction_dict["ids"] = ids
@@ -519,20 +553,32 @@ if config.TRAIN:
     LOGGER.info(f"========== CV ==========")
     get_result(oof_df)
     oof_df.to_csv(paths.OUTPUT_DIR + '/oof_df.csv', index=False)
+    if config.WANDB:
+        wandb.finish()
 
-else:
-    test_df = pd.read_csv(paths.TEST_ESSAYS, sep=',')
-    print(f"Test summaries dataframe has shape: {test_df.shape}"), sep()
+    oof_df["preds"] = oof_df["preds"].apply(lambda x: sigmoid(x))
 
-    tokenizer = AutoTokenizer.from_pretrained(paths.MODEL_PATH + "/tokenizer")
-    # === Add special tokens ===
-    vocabulary = tokenizer.get_vocab()
-    total_tokens = len(vocabulary)
-    print("Total number of tokens in the tokenizer:", total_tokens)
-    print(tokenizer)
     
-    predictions = inference_fn(config, test_df, tokenizer, device)
-    submission = pd.read_csv(paths.SUBMISSION_CSV)
-    submission["generated"] = predictions["predictions"]
-    submission["generated"] = submission["generated"].apply(lambda x: sigmoid(x))
-    submission.to_csv("submission.csv", index=False)
+    def binarize(x, threshold):
+        if x > threshold:
+            x = 1
+        else:
+            x = 0
+        return x
+
+    # Assuming df is your pandas DataFrame
+    oof_df["binary"] = oof_df["preds"].apply(lambda x: binarize(x, 0.5))
+    true_labels = oof_df["generated"].values
+    predicted_labels = oof_df["binary"].values
+
+    # Get the unique classes from both true and predicted labels
+    classes = np.unique(np.concatenate((true_labels, predicted_labels)))
+
+    # Compute the confusion matrix
+    cm = confusion_matrix(true_labels, predicted_labels, labels=classes)
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=classes, yticklabels=classes)
+    plt.xlabel("Predicted Labels")
+    plt.ylabel("True Labels")
+    plt.title("Confusion Matrix")
+    plt.show()
