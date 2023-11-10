@@ -76,9 +76,9 @@ class config:
     PRINT_FREQ = 20
     SCHEDULER = 'cosine' # ['linear', 'cosine']
     SEED = 27
-    TRAIN = False
+    TRAIN = True
     TRAIN_FOLDS = [0, 1, 2, 3]
-    WANDB = False
+    WANDB = True
     WEIGHT_DECAY = 0.01
 
     
