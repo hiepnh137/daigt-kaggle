@@ -189,7 +189,7 @@ if config.WANDB:
         # user_secrets = UserSecretsClient()
         # secret_value_0 = user_secrets.get_secret("wandb_api")
         # wandb.login(key=secret_value_0)
-        # anony = None
+        anony = None
         wandb.login(key='a3cae2e24b9f52f5007c896738f0fb473b2f3ad5')
     except:
         anony = "must"
