@@ -41,7 +41,12 @@ import pandas as pd
 import seaborn as sns
 
 from sklearn.metrics import confusion_matrix
+import argparse
 
+parser = argparse.ArgumentParser(description='Process some integers.')
+parser.add_argument('--exp_name', type=str, default='test')
+
+args = parser.parse_args()
 
 # ======= OPTIONS =========
 pd.set_option('display.max_rows', 500)
@@ -196,7 +201,7 @@ if config.WANDB:
         print('If you want to use your W&B account, go to Add-ons -> Secrets and provide your W&B access token. Use the Label name as wandb_api. \nGet your W&B access token from here: https://wandb.ai/authorize')
 
     run = wandb.init(project='kaggle-daigt', 
-                     name="test_1",
+                     name=args.exp_name,
                      config=get_config_dict(config),
                     #  group="anti_overfit",
                      job_type="train",
