@@ -412,6 +412,13 @@ def train_loop(folds, fold):
     torch.save(model.config, paths.OUTPUT_DIR + '/config.pth')
     model.to(device)
 
+    # freeze 6 first layers
+    freeze_layers = [model.model.embeddings, model.model.encoder.layer[:6]]
+    for module in freeze_layers:
+        for param in module.parameters():
+            param.requires_grad = False
+    #---------------------------------
+
     optimizer_parameters = get_optimizer_params(model,
                                                 encoder_lr=config.ENCODER_LR, 
                                                 decoder_lr=config.DECODER_LR,
