@@ -317,7 +317,7 @@ def train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, dev
             with torch.cuda.amp.autocast(enabled=config.APEX):
                 y_preds = model(inputs) # forward propagation pass
                 loss = criterion(y_preds, labels.unsqueeze(1)) # get loss
-                w = torch.ones(labels.shape)*weight
+                w = torch.ones(labels.shape).to(loss.device)*weight
                 w = w/torch.sum(w)
                 loss = torch.sum(w*loss)
             if config.GRADIENT_ACCUMULATION_STEPS > 1:
@@ -373,7 +373,7 @@ def valid_epoch(valid_loader, model, criterion, device, weight=6.75):
             with torch.no_grad():
                 y_preds = model(inputs) # forward propagation pass
                 loss = criterion(y_preds, labels.unsqueeze(1)) # get loss
-                w = torch.ones(labels.shape)*weight
+                w = torch.ones(labels.shape).to(loss.device)*weight
                 w = w/torch.sum(w)
                 loss = torch.sum(w*loss)
             if config.GRADIENT_ACCUMULATION_STEPS > 1:
