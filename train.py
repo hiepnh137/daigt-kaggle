@@ -68,7 +68,7 @@ class config:
     ENCODER_LR = 2e-5
     EPOCHS = 5
     EPS = 1e-6
-    FOLDS = 4
+    FOLDS = 2
     GRADIENT_ACCUMULATION_STEPS = 1
     GRADIENT_CHECKPOINTING = True
     MAX_GRAD_NORM=1000
@@ -547,8 +547,8 @@ if config.TRAIN:
     
     real_indice = train_df[train_df['generated']==0].index
     fake_indice = train_df[train_df['generated']==1].index
-    real_choice_valid = np.random.choice(real_indice, 1000)
-    fake_choice_valid = np.random.choice(fake_indice, 1000)
+    real_choice_valid = np.random.choice(real_indice, 1000, replace=False)
+    fake_choice_valid = np.random.choice(fake_indice, 1000, replace=False)
     train_df['fold'] = 1
     train_df.loc[real_choice_valid, 'fold'] = 0
     train_df.loc[fake_choice_valid, 'fold'] = 0
