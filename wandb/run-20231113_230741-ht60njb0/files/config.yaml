@@ -1,0 +1,125 @@
+wandb_version: 1
+
+APEX:
+  desc: null
+  value: true
+BATCH_SCHEDULER:
+  desc: null
+  value: true
+BATCH_SIZE_TRAIN:
+  desc: null
+  value: 32
+BATCH_SIZE_VALID:
+  desc: null
+  value: 16
+BETAS:
+  desc: null
+  value:
+  - 0.9
+  - 0.999
+DEBUG:
+  desc: null
+  value: false
+DECODER_LR:
+  desc: null
+  value: 2.0e-05
+ENCODER_LR:
+  desc: null
+  value: 2.0e-05
+EPOCHS:
+  desc: null
+  value: 5
+EPS:
+  desc: null
+  value: 1.0e-06
+FOLDS:
+  desc: null
+  value: 2
+GRADIENT_ACCUMULATION_STEPS:
+  desc: null
+  value: 1
+GRADIENT_CHECKPOINTING:
+  desc: null
+  value: true
+MAX_GRAD_NORM:
+  desc: null
+  value: 1000
+MAX_LEN:
+  desc: null
+  value: 512
+MIN_LR:
+  desc: null
+  value: 1.0e-06
+MODEL:
+  desc: null
+  value: microsoft/deberta-v3-base
+NUM_CYCLES:
+  desc: null
+  value: 0.5
+NUM_WARMUP_STEPS:
+  desc: null
+  value: 0
+NUM_WORKERS:
+  desc: null
+  value: 8
+PRINT_FREQ:
+  desc: null
+  value: 20
+SCHEDULER:
+  desc: null
+  value: cosine
+SEED:
+  desc: null
+  value: 27
+TRAIN:
+  desc: null
+  value: true
+TRAIN_FOLDS:
+  desc: null
+  value:
+  - 0
+  - 1
+  - 2
+  - 3
+WANDB:
+  desc: null
+  value: true
+WEIGHT_DECAY:
+  desc: null
+  value: 0.01
+_wandb:
+  desc: null
+  value:
+    python_version: 3.8.18
+    cli_version: 0.16.0
+    framework: huggingface
+    huggingface_version: 4.35.0
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    start_time: 1699891661.255796
+    t:
+      1:
+      - 1
+      - 5
+      - 11
+      - 49
+      - 53
+      - 55
+      2:
+      - 1
+      - 5
+      - 11
+      - 49
+      - 53
+      - 55
+      3:
+      - 13
+      - 16
+      - 23
+      4: 3.8.18
+      5: 0.16.0
+      6: 4.35.0
+      8:
+      - 4
+      - 5
+      13: darwin-arm64

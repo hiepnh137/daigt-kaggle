@@ -85,7 +85,7 @@ class config:
     TRAIN_FOLDS = [0, 1, 2, 3]
     WANDB = True
     WEIGHT_DECAY = 0.01
-
+    WEIGHT_LOSS=0.65
     
 class kaggle_paths:
     OUTPUT_DIR = "/kaggle/working/output"
@@ -296,7 +296,7 @@ def timeSince(since, percent):
     return '%s (remain %s)' % (asMinutes(s), asMinutes(rs))
 
 
-def train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, device):
+def train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, device, weight=6.75):
     """One epoch training pass."""
     model.train() # set model in train mode
     scaler = torch.cuda.amp.GradScaler(enabled=config.APEX) # Automatic Mixed Precision tries to match each op to its appropriate datatype.
@@ -317,6 +317,9 @@ def train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, dev
             with torch.cuda.amp.autocast(enabled=config.APEX):
                 y_preds = model(inputs) # forward propagation pass
                 loss = criterion(y_preds, labels.unsqueeze(1)) # get loss
+                w = torch.ones(labels.shape)*weight
+                w = w/torch.sum(w)
+                loss = torch.sum(w*loss)
             if config.GRADIENT_ACCUMULATION_STEPS > 1:
                 loss = loss / config.GRADIENT_ACCUMULATION_STEPS
             losses.update(loss.item(), batch_size) # update loss function tracking
@@ -351,7 +354,7 @@ def train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, dev
     return losses.avg
 
 
-def valid_epoch(valid_loader, model, criterion, device):
+def valid_epoch(valid_loader, model, criterion, device, weight=6.75):
     model.eval() # set model in evaluation mode
     losses = AverageMeter() # initiate AverageMeter for tracking the loss.
     prediction_dict = {}
@@ -370,6 +373,9 @@ def valid_epoch(valid_loader, model, criterion, device):
             with torch.no_grad():
                 y_preds = model(inputs) # forward propagation pass
                 loss = criterion(y_preds, labels.unsqueeze(1)) # get loss
+                w = torch.ones(labels.shape)*weight
+                w = w/torch.sum(w)
+                loss = torch.sum(w*loss)
             if config.GRADIENT_ACCUMULATION_STEPS > 1:
                 loss = loss / config.GRADIENT_ACCUMULATION_STEPS
             losses.update(loss.item(), batch_size) # update loss function tracking
@@ -459,8 +465,8 @@ def train_loop(folds, fold):
     )
 
     # ======= LOSS ==========
-    criterion = nn.BCEWithLogitsLoss()
-    
+    criterion = nn.BCEWithLogitsLoss(reduction='none')
+    WEIGHT=config.WEIGHT_LOSS
     best_score = -np.inf
     # ====== ITERATE EPOCHS ========
     for epoch in range(config.EPOCHS):
@@ -468,10 +474,10 @@ def train_loop(folds, fold):
         start_time = time.time()
 
         # ======= TRAIN ==========
-        avg_loss = train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, device)
+        avg_loss = train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, device, weight=WEIGHT)
 
         # ======= EVALUATION ==========
-        avg_val_loss, prediction_dict = valid_epoch(valid_loader, model, criterion, device)
+        avg_val_loss, prediction_dict = valid_epoch(valid_loader, model, criterion, device, weight=WEIGHT)
         predictions = prediction_dict["predictions"]
         # ======= SCORING ==========
         score = get_score(valid_labels, sigmoid(predictions))

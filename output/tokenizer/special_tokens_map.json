@@ -5,5 +5,11 @@
   "mask_token": "[MASK]",
   "pad_token": "[PAD]",
   "sep_token": "[SEP]",
-  "unk_token": "[UNK]"
+  "unk_token": {
+    "content": "[UNK]",
+    "lstrip": false,
+    "normalized": true,
+    "rstrip": false,
+    "single_word": false
+  }
 }
