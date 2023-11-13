@@ -160,6 +160,5 @@ cython_debug/
 #.idea/
 
 data/
-./train_essays_3.0.csv
 output/
 wandb/
