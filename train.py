@@ -550,8 +550,8 @@ if config.TRAIN:
     real_choice_valid = np.random.choice(real_indice, 1000)
     fake_choice_valid = np.random.choice(fake_indice, 1000)
     train_df['fold'] = 1
-    train_df[real_choice_valid, 'fold'] = 0
-    train_df[fake_choice_valid, 'fold'] = 0
+    train_df.loc[real_choice_valid, 'fold'] = 0
+    train_df.loc[fake_choice_valid, 'fold'] = 0
     # skf = StratifiedKFold(n_splits=5)
 
     # X = train_df.loc[:, train_df.columns != "generated"]
