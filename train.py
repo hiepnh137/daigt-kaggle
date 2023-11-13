@@ -259,7 +259,7 @@ class CustomDataset(Dataset):
         if str(self.text_ids[item]).lower() == 'nan':
             output["ids"] = float('nan')
         else:
-            output["ids"] = self.text_ids[item]
+            output["ids"] = float(self.text_ids[item])
         return output
 
 
