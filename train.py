@@ -256,7 +256,10 @@ class CustomDataset(Dataset):
         output = {}
         output["inputs"] = prepare_input(self.cfg, self.texts[item], self.tokenizer)
         output["labels"] = torch.tensor(self.labels[item], dtype=torch.float) # TODO: check dtypes
-        output["ids"] = self.text_ids[item]
+        if str(self.text_ids[item]).lower() == 'nan':
+            output["ids"] = float('nan')
+        else:
+            output["ids"] = self.text_ids[item]
         return output
 
 
