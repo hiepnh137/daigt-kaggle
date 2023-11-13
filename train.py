@@ -83,7 +83,7 @@ class config:
     SEED = 27
     TRAIN = True
     TRAIN_FOLDS = [0, 1, 2, 3]
-    WANDB = False
+    WANDB = True
     WEIGHT_DECAY = 0.01
 
     
