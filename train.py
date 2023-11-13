@@ -83,7 +83,7 @@ class config:
     SEED = 27
     TRAIN = True
     TRAIN_FOLDS = [0, 1, 2, 3]
-    WANDB = True
+    WANDB = False
     WEIGHT_DECAY = 0.01
 
     
@@ -399,6 +399,17 @@ def train_loop(folds, fold):
     valid_labels = valid_folds['generated'].values
 
     # ======== DATASETS ==========
+    label0_dataset = train_folds[train_folds['generated']==0]
+    label1_dataset = train_folds[train_folds['generated']==1]
+    dataset = pd.concat([label0_dataset,
+                    label1_dataset,
+                    label1_dataset,
+                    label1_dataset,
+                    label1_dataset,
+                    label1_dataset,
+                    ], 
+                    ignore_index=True)
+    train_folds = dataset
     train_dataset = CustomDataset(config, train_folds, tokenizer)
     valid_dataset = CustomDataset(config, valid_folds, tokenizer)
     
@@ -418,10 +429,10 @@ def train_loop(folds, fold):
     model.to(device)
 
     # freeze 6 first layers
-    freeze_layers = [model.model.embeddings, model.model.encoder.layer[:6]]
-    for module in freeze_layers:
-        for param in module.parameters():
-            param.requires_grad = False
+    # freeze_layers = [model.model.embeddings, model.model.encoder.layer[:6]]
+    # for module in freeze_layers:
+    #     for param in module.parameters():
+    #         param.requires_grad = False
     #---------------------------------
 
     optimizer_parameters = get_optimizer_params(model,
