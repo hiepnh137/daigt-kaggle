@@ -85,7 +85,7 @@ class config:
     TRAIN_FOLDS = [0, 1, 2, 3]
     WANDB = True
     WEIGHT_DECAY = 0.01
-    WEIGHT_LOSS=0.65
+    WEIGHT_LOSS=6.5
     
 class kaggle_paths:
     OUTPUT_DIR = "/kaggle/working/output"
