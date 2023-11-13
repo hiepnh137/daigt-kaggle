@@ -408,18 +408,18 @@ def train_loop(folds, fold):
     valid_labels = valid_folds['generated'].values
 
     # ======== DATASETS ==========
-    label0_dataset = train_folds[train_folds['generated']==0]
-    label1_dataset = train_folds[train_folds['generated']==1]
-    dataset = pd.concat([label0_dataset,
-                    label1_dataset,
-                    label1_dataset,
-                    label1_dataset,
-                    label1_dataset,
-                    label1_dataset,
-                    label1_dataset
-                    ], 
-                    ignore_index=True)
-    train_folds = dataset
+    # label0_dataset = train_folds[train_folds['generated']==0]
+    # label1_dataset = train_folds[train_folds['generated']==1]
+    # dataset = pd.concat([label0_dataset,
+    #                 label1_dataset,
+    #                 label1_dataset,
+    #                 label1_dataset,
+    #                 label1_dataset,
+    #                 label1_dataset,
+    #                 label1_dataset
+    #                 ], 
+    #                 ignore_index=True)
+    # train_folds = dataset
     train_dataset = CustomDataset(config, train_folds, tokenizer)
     valid_dataset = CustomDataset(config, valid_folds, tokenizer)
     
