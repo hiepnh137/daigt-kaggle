@@ -68,7 +68,7 @@ class config:
     ENCODER_LR = 2e-5
     EPOCHS = 5
     EPS = 1e-6
-    FOLDS = 2
+    FOLDS = 4
     GRADIENT_ACCUMULATION_STEPS = 1
     GRADIENT_CHECKPOINTING = True
     MAX_GRAD_NORM=1000
@@ -83,9 +83,9 @@ class config:
     SEED = 27
     TRAIN = True
     TRAIN_FOLDS = [0, 1, 2, 3]
-    WANDB = True
+    WANDB = False
     WEIGHT_DECAY = 0.01
-    WEIGHT_LOSS=6.5
+
     
 class kaggle_paths:
     OUTPUT_DIR = "/kaggle/working/output"
@@ -256,10 +256,7 @@ class CustomDataset(Dataset):
         output = {}
         output["inputs"] = prepare_input(self.cfg, self.texts[item], self.tokenizer)
         output["labels"] = torch.tensor(self.labels[item], dtype=torch.float) # TODO: check dtypes
-        if str(self.text_ids[item]).lower() == 'nan':
-            output["ids"] = str(float('nan'))
-        else:
-            output["ids"] = self.text_ids[item]
+        output["ids"] = self.text_ids[item]
         return output
 
 
@@ -296,7 +293,7 @@ def timeSince(since, percent):
     return '%s (remain %s)' % (asMinutes(s), asMinutes(rs))
 
 
-def train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, device, weight=6.75):
+def train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, device):
     """One epoch training pass."""
     model.train() # set model in train mode
     scaler = torch.cuda.amp.GradScaler(enabled=config.APEX) # Automatic Mixed Precision tries to match each op to its appropriate datatype.
@@ -317,9 +314,6 @@ def train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, dev
             with torch.cuda.amp.autocast(enabled=config.APEX):
                 y_preds = model(inputs) # forward propagation pass
                 loss = criterion(y_preds, labels.unsqueeze(1)) # get loss
-                w = torch.ones(labels.shape).to(loss.device)*weight
-                w = w/torch.sum(w)
-                loss = torch.sum(w*loss)
             if config.GRADIENT_ACCUMULATION_STEPS > 1:
                 loss = loss / config.GRADIENT_ACCUMULATION_STEPS
             losses.update(loss.item(), batch_size) # update loss function tracking
@@ -354,7 +348,7 @@ def train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, dev
     return losses.avg
 
 
-def valid_epoch(valid_loader, model, criterion, device, weight=6.75):
+def valid_epoch(valid_loader, model, criterion, device):
     model.eval() # set model in evaluation mode
     losses = AverageMeter() # initiate AverageMeter for tracking the loss.
     prediction_dict = {}
@@ -373,9 +367,6 @@ def valid_epoch(valid_loader, model, criterion, device, weight=6.75):
             with torch.no_grad():
                 y_preds = model(inputs) # forward propagation pass
                 loss = criterion(y_preds, labels.unsqueeze(1)) # get loss
-                w = torch.ones(labels.shape).to(loss.device)*weight
-                w = w/torch.sum(w)
-                loss = torch.sum(w*loss)
             if config.GRADIENT_ACCUMULATION_STEPS > 1:
                 loss = loss / config.GRADIENT_ACCUMULATION_STEPS
             losses.update(loss.item(), batch_size) # update loss function tracking
@@ -408,18 +399,17 @@ def train_loop(folds, fold):
     valid_labels = valid_folds['generated'].values
 
     # ======== DATASETS ==========
-    # label0_dataset = train_folds[train_folds['generated']==0]
-    # label1_dataset = train_folds[train_folds['generated']==1]
-    # dataset = pd.concat([label0_dataset,
-    #                 label1_dataset,
-    #                 label1_dataset,
-    #                 label1_dataset,
-    #                 label1_dataset,
-    #                 label1_dataset,
-    #                 label1_dataset
-    #                 ], 
-    #                 ignore_index=True)
-    # train_folds = dataset
+    label0_dataset = train_folds[train_folds['generated']==0]
+    label1_dataset = train_folds[train_folds['generated']==1]
+    dataset = pd.concat([label0_dataset,
+                    label1_dataset,
+                    label1_dataset,
+                    label1_dataset,
+                    label1_dataset,
+                    label1_dataset,
+                    ], 
+                    ignore_index=True)
+    train_folds = dataset
     train_dataset = CustomDataset(config, train_folds, tokenizer)
     valid_dataset = CustomDataset(config, valid_folds, tokenizer)
     
@@ -465,8 +455,8 @@ def train_loop(folds, fold):
     )
 
     # ======= LOSS ==========
-    criterion = nn.BCEWithLogitsLoss(reduction='none')
-    WEIGHT=config.WEIGHT_LOSS
+    criterion = nn.BCEWithLogitsLoss()
+    
     best_score = -np.inf
     # ====== ITERATE EPOCHS ========
     for epoch in range(config.EPOCHS):
@@ -474,10 +464,10 @@ def train_loop(folds, fold):
         start_time = time.time()
 
         # ======= TRAIN ==========
-        avg_loss = train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, device, weight=WEIGHT)
+        avg_loss = train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, device)
 
         # ======= EVALUATION ==========
-        avg_val_loss, prediction_dict = valid_epoch(valid_loader, model, criterion, device, weight=WEIGHT)
+        avg_val_loss, prediction_dict = valid_epoch(valid_loader, model, criterion, device)
         predictions = prediction_dict["predictions"]
         # ======= SCORING ==========
         score = get_score(valid_labels, sigmoid(predictions))
@@ -554,23 +544,12 @@ if config.TRAIN:
     '''
         Stratified K Fold
     '''
-    
-    real_indice = train_df[train_df['generated']==0].index
-    fake_indice = train_df[train_df['generated']==1].index
-    real_choice_valid = np.random.choice(real_indice, 1000, replace=False)
-    fake_choice_valid = np.random.choice(fake_indice, 1000, replace=False)
-    train_df['fold'] = 1
-    train_df.loc[real_choice_valid, 'fold'] = 0
-    train_df.loc[fake_choice_valid, 'fold'] = 0
-    # skf = StratifiedKFold(n_splits=5)
+    skf = StratifiedKFold(n_splits=5)
+    X = train_df.loc[:, train_df.columns != "generated"]
+    y = train_df.loc[:, train_df.columns == "generated"]
 
-    # X = train_df.loc[:, train_df.columns != "generated"]
-    # y = train_df.loc[:, train_df.columns == "generated"]
-
-
-
-    # for i, (train_index, valid_index) in enumerate(skf.split(X, y)):
-    #     train_df.loc[valid_index, "fold"] = i
+    for i, (train_index, valid_index) in enumerate(skf.split(X, y)):
+        train_df.loc[valid_index, "fold"] = i
         
     print(train_df.groupby("fold")["generated"].value_counts())
     train_df.head()
